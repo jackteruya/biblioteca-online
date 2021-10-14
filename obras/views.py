@@ -1,4 +1,4 @@
-from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.generics import ListCreateAPIView, RetrieveDestroyAPIView, CreateAPIView, ListAPIView
 from rest_framework_csv.renderers import CSVRenderer
 from rest_framework_csv.parsers import CSVParser
@@ -7,8 +7,8 @@ from rest_framework.response import Response
 
 import pandas as pd
 
-from obras.models import Obras, Autor
-from obras.serializers import ObrasSerializer
+from obras.models import Obras
+from obras.serializers import ObrasSerializer, AutorSerializer
 
 
 class CadastrarListarObraAPIView(ListCreateAPIView):
@@ -23,16 +23,20 @@ class CadastrarObrasCSVAPIView(CreateAPIView):
     serializer_class = ObrasSerializer
     parser_classes = [CSVParser, MultiPartParser, FormParser]
 
-    def post(self, request, format=None):
+    def post(self, request, *args, **kwargs):
         data = request.data['arquivo']
         df = pd.read_csv(data)
         for i in range(len(df)):
+            autores_df = df['autores'][i]
+            autores_tuple = autores_df.split(",")
+            autores = [x.strip(",") for x in autores_tuple if x != ","]
             data = {'titulo': df['titulo'][i],
                     'editora': df['editora'][i],
                     'foto': df['foto'][i],
-                    'autores': df['autores'][i]}
+                    'autores': [AutorSerializer(data=autor).save() for autor in autores if AutorSerializer(data=autor).is_valid()]}
             serializer = self.get_serializer(data=data)
             serializer.is_valid()
+            serializer.save()
         return Response()
 
 
